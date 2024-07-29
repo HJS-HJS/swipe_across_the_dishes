@@ -1,0 +1,28 @@
+# Inference Configuration
+planner:
+  gripper: "hanyang"  # "vertical", "hanyang"
+  # visualize: True
+  visualize: False
+
+swipe_margin: 0.02 # unit: m
+
+hybrid:
+  grid_size: 0.05  # unit: m
+  dtheta:  5  # unit: deg
+
+gripper:
+  vertical:
+    height: 0.03
+    z_angle: 0
+    finger_angle: 180 # robotiq2f
+    x_offset: 0
+
+
+  hanyang:
+    height: 0.015
+    # height: 0.03
+    # z_angle: -1.81759703
+    z_angle: +13.1825
+    finger_angle: 120 # hanyang
+    x_offset: -0.038990381
+

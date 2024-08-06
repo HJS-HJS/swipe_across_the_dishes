@@ -54,87 +54,27 @@ class EdgeSampler(object):
     def __init__(self, camera_intr, camera_extr):
         self.camera_intr = camera_intr
         self.camera_extr = camera_extr
-        self._width_error_threshold = 1e-3
         
     def sample(self, masked_depth_image):
-
         # Get point cloud of the object only
-        # pcd = self.depth_to_pcd(masked_depth_image, camera_intrinsic)
-        # pcd_object = pcd[np.where(pcd[:,2] > 0.1)[0]]
         pcd_object = self.depth_to_pcd(masked_depth_image, self.camera_intr)
         
         # Transform point cloud to world frame
         pcd_w = (np.matmul(self.camera_extr[:3,:3], pcd_object[:,:3].T) + self.camera_extr[:3,3].reshape(3,1)).T
         
-        #########################
-        #  Height Thresholding ##
-        #########################
-        
-        # threshold_height = 0.01
-        ## Remove points that are too close to the ground
-        # pcd_w = pcd_w[np.where(pcd_w[:,2] > threshold_height)[0]]
+        # Height Thresholding
         
         max_height = np.max(pcd_w[:,2]) - (np.max(pcd_w[:,2]) - np.min(pcd_w[:,2])) * 0.1
         pcd_w = pcd_w[np.where(pcd_w[:,2] < max_height)[0]]
         min_height = np.min(pcd_w[:,2]) + (np.max(pcd_w[:,2]) - np.min(pcd_w[:,2])) * 0.05
         pcd_w = pcd_w[np.where(pcd_w[:,2] > min_height)[0]]
-        ##########################################
-        # Edge Detection - alpha shape algorithm #
-        ##########################################
-        
-        # Calculate the Delaunay triangulation of the point cloud
+
+        # Edge Detection - alpha shape algorithm
         pcd_w_2d = pcd_w[:,:2]
-
-        # Define the alpha value (adjust according to your data)
-        # alpha_value = 500
-
-        # # Calculate the alpha shape of the point cloud
-        # alpha_shape = alphashape.alphashape(pcd_w_2d, alpha=alpha_value)
-        
-        # if type(alpha_shape) == MultiPolygon:
-        #     xs, ys = [], []
-        #     for poly in alpha_shape.geoms:
-        #         exterior = poly.exterior.coords[:]
-        #         x, y = zip(*exterior)
-        #         xs += list(x)
-        #         ys += list(y)
-        #     xs = np.array(xs).reshape(-1, 1)
-        #     ys = np.array(ys).reshape(-1, 1)
-        #     outermost_points = np.hstack((xs, ys))
-        # elif type(alpha_shape) == Polygon:
-        #     outermost_points = np.array(alpha_shape.exterior.coords)
-        # Get the points on the precise contour
-        # outermost_points = np.array(alpha_shape.exterior.coords)
-        
-        # Find the convex hull of the point cloud
         hull = ConvexHull(pcd_w_2d)
-
-        # Get the indices of the points on the outermost contour
         outermost_indices = hull.vertices
         
-        # Get the points on the outermost contour
-        outermost_points = pcd_w_2d[outermost_indices]
-        
-        # Extract x and y coordinates from the contour points
-        # x = outermost_points[:, 0]
-        # y = outermost_points[:, 1]
-        # num_interpolated_points = 500
-        # # Create an interpolation function for x and y coordinates separately
-        # interpolation_function_x = interp1d(np.arange(len(x)), x, kind='linear')
-        # interpolation_function_y = interp1d(np.arange(len(y)), y, kind='linear')
-
-        # # Generate evenly spaced indices for interpolation
-        # interpolation_indices = np.linspace(0, len(x)-1, num=num_interpolated_points)
-
-        # # Interpolate x and y coordinates using the interpolation functions
-        # x_interpolated = interpolation_function_x(interpolation_indices)
-        # y_interpolated = interpolation_function_y(interpolation_indices)
-
-        # # Create the interpolated trajectory with m points (m, 2)
-        # interpolated_contour_points = np.column_stack((x_interpolated, y_interpolated))
-        # edge_list_xyz = np.hstack([interpolated_contour_points, 0.005 * np.zeros(len(interpolated_contour_points)).reshape(-1,1)]).reshape(-1,3)
-        
-
+        # Interpolate
         num_interpolated_points = 1000
         outermost_indices = np.append(outermost_indices, outermost_indices[0])
         edge_list_xyz = self.interpolate_with_even_distance(pcd_w[outermost_indices], num_interpolated_points)

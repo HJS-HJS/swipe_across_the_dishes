@@ -1,20 +1,47 @@
 import numpy as np
 
-def angle_diff(a:float, b:float)->float:
-    """calculate minumum angle difference
+class Angle():
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
 
-    Args:
-        a (float): angle 1
-        b (float): angle 2
+    def resize(self, size):
+        self.start += size
+        self.end += size
 
-    Returns:
-        float: angle difference between two angles
-    """
-    if np.sign(a * b) < 0:
-        if np.abs(b - a) < np.abs(b - a + np.sign(a) * 2 * np.pi):
-            return b - a
-        else:
-            return b - a + np.sign(a) * 2 * np.pi
-    else:
-        return b - a
+    def add_margin(self, margin):
+        self.start -= margin
+        self.end += margin
+
+    @property
+    def center(self):
+        return (self.start + self.end) / 2
+
+    @property
+    def size(self):
+        return self.end - self.start
     
+    @staticmethod
+    def sum(a, b):
+        diff = (b.center - a.center)%(2 * np.pi)
+        if diff > np.pi:
+            a, b = b, a
+            diff = 2 * np.pi - diff
+            # print("a, b changed")
+
+        # center = (a.center + diff / 2) % (2 * np.pi)
+        offset = a.center + diff - b.center
+        b.resize(offset)
+        start = np.min([a.start, b.start])
+        end = np.max([a.end, b.end])
+
+        test = Angle(start, end)
+
+        b.resize(-offset)
+
+        return test
+    
+    @staticmethod
+    def distance(a, b):
+        sum = Angle.sum(a,b)
+        return (sum.end - sum.start)

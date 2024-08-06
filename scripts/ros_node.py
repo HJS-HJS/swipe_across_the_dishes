@@ -16,9 +16,9 @@ from moveit_msgs.msg import CartesianTrajectory, CartesianTrajectoryPoint
 
 from swipe_across_the_dishes.srv import GetSwipeDishesPath, GetSwipeDishesPathRequest, GetSwipeDishesPathResponse
 from swipe_dishes.utils.edge_sampler import EdgeSampler
-from swipe_dishes.utils.ellipse import Ellipse, Angle
 from swipe_dishes.utils.ee_converter import cartesianTraj2EETraj
-from swipe_dishes.utils.utils import *
+from swipe_dishes.utils.ellipse import Ellipse
+from swipe_dishes.utils.utils import Angle
 
 class SwipeAcrossTheDishesServer(object):
     

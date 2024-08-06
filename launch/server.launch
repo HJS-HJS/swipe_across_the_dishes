@@ -1,5 +1,5 @@
 <launch>
-  <arg name="node_name" default="stable_push_planner" />
+  <arg name="node_name" default="swipe_dish_planner_ros" />
   <remap from="/camera/depth_original/image_raw"   to="/camera/depth/image_raw"/>
   <remap from="/camera/depth_original/camera_info"   to="/camera/depth/camera_info"/>
 
@@ -8,7 +8,7 @@
   <remap from="/camera/depth/image_raw"   to="/camera/aligned_depth_to_color/image_raw"/>
   <remap from="/camera/depth/camera_info"   to="/camera/aligned_depth_to_color/camera_info"/>
 
-  <node name="$(arg node_name)" pkg="stable_push_net_ros" type="ros_node.py" output="screen" >
-    <rosparam command="load" file="$(find stable_push_net_ros)/config/config.yaml" />
+  <node name="$(arg node_name)" pkg="swipe_across_the_dishes" type="ros_node.py" output="screen" >
+    <rosparam command="load" file="$(find swipe_across_the_dishes)/config/config.yaml" />
   </node>
 </launch>

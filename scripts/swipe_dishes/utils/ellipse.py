@@ -1,11 +1,61 @@
 import numpy as np
 
-class Ellipse(object):
-    def __init__(self, x, y):
-        self.coeffs = Ellipse.fit_ellipse(x, y)
-        self.pole = Ellipse.cart_to_pol(self.coeffs)
+class Angle():
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
 
-    def get_ellipse_pts(self, npts:int=100, tmin:float=0, tmax:float=2*np.pi):
+    def resize(self, size):
+        self.start += size
+        self.end += size
+
+    def add_margin(self, margin):
+        self.start -= margin
+        self.end += margin
+
+    @property
+    def center(self):
+        return (self.start + self.end) / 2
+
+    @property
+    def size(self):
+        return self.end - self.start
+    
+    @staticmethod
+    def sum(a, b):
+        diff = (b.center - a.center)%(2 * np.pi)
+        if diff > np.pi:
+            a, b = b, a
+            diff = 2 * np.pi - diff
+            # print("a, b changed")
+
+        # center = (a.center + diff / 2) % (2 * np.pi)
+        offset = a.center + diff - b.center
+        b.resize(offset)
+        start = np.min([a.start, b.start])
+        end = np.max([a.end, b.end])
+
+        test = Angle(start, end)
+
+        b.resize(-offset)
+
+        return test
+    
+    @staticmethod
+    def distance(a, b):
+        sum = Angle.sum(a,b)
+        return (sum.end - sum.start)
+
+
+class Ellipse(object):
+    def __init__(self, x, y, mode:str = "fit"):
+        if mode == "fit":
+            self.coeffs = Ellipse.fit_ellipse(x, y)
+            self.pole = Ellipse.cart_to_pol(self.coeffs)
+        elif mode == "tangent":
+            self.pole = Ellipse.tangent_circle(x[0], x[1], y)
+
+    def get_ellipse_pts(self, npts:int=100, tmin:float=0, trange:float=2*np.pi):
         """
         Return npts points on the ellipse described by the params = x0, y0, ap,
         bp, e, phi for values of the parametric variable t between tmin and tmax.
@@ -13,11 +63,19 @@ class Ellipse(object):
         """
         x0, y0, ap, bp, e, phi = self.pole
         # A grid of the parametric variable, t.
-        t = np.linspace(tmin, tmax, npts)
-        x = x0 + ap * np.cos(t) * np.cos(phi) - bp * np.sin(t) * np.sin(phi)
-        y = y0 + ap * np.cos(t) * np.sin(phi) + bp * np.sin(t) * np.cos(phi)
-        return x, y
+        t = np.linspace(tmin, tmin + trange, npts) - phi
+        r = np.sqrt(bp**2 / (1-e**2 * np.cos(t)**2))
+        # angle
+        x = x0 + r * np.cos(t) * np.cos(phi) - r * np.sin(t) * np.sin(phi)
+        y = y0 + r * np.cos(t) * np.sin(phi) + r * np.sin(t) * np.cos(phi)
+        return np.array([x, y])
 
+    def get_approach_path(self, npts:int=25, tmin:float=0, trange:float=2*np.pi, width:float=0.1):
+        path_xy = self.get_ellipse_pts(npts=npts, tmin=tmin, trange=trange)
+        tan_vector = (path_xy[:,-1] - path_xy[:,-2]) / np.linalg.norm(path_xy[:,-1] - path_xy[:,-2])
+        offset_point = path_xy[:,-1] + width * tan_vector
+        return np.flip(np.concatenate([path_xy, offset_point.reshape(-1,1)], axis = 1), axis = 1)
+        
     def resize_ratio(self, ratio:float = 1.0):
         x0, y0, ap, bp, e, phi = self.pole
         self.pole = (x0, y0, ratio * ap, ratio * bp, e, phi)
@@ -30,6 +88,9 @@ class Ellipse(object):
     def size(self):
         return self.pole[2], self.pole[3]
     @property
+    def radius(self):
+        return (self.pole[2] + self.pole[3]) / 2
+    @property
     def center(self):
         return np.array([self.pole[0], self.pole[1]])
 
@@ -39,13 +100,25 @@ class Ellipse(object):
         r = np.sqrt(bp**2 / (1-e**2 * np.cos(angle)**2))
         x = x0 + r * np.cos(angle) * np.cos(phi) - r * np.sin(angle) * np.sin(phi)
         y = y0 + r * np.cos(angle) * np.sin(phi) + r * np.sin(angle) * np.cos(phi)
-        return np.array([x, y])
-    
+        return x, y
+
     def lengh(self, angle:float):
         x0, y0, ap, bp, e, phi = self.pole
         angle = angle - phi
         r = np.sqrt(bp**2 / (1-e**2 * np.cos(angle)**2))
         return np.sqrt(bp**2 / (1-e**2 * np.cos(angle)**2))
+    
+    def tangent_vector(self, angle):
+        x0, y0, ap, bp, e, phi = self.pole
+        angle = angle - phi
+        vector = np.arctan2(bp * np.cos(angle), -ap * np.sin(angle)) + phi
+        return vector
+    
+    def normal_vector(self, angle):
+        x0, y0, ap, bp, e, phi = self.pole
+        angle = angle - phi
+        vector = np.arctan2(bp * np.cos(angle), -ap * np.sin(angle)) + phi
+        return vector - np.pi/2
     
     @staticmethod
     def fit_ellipse(x, y):
@@ -136,20 +209,43 @@ class Ellipse(object):
         return x0, y0, ap, bp, e, phi
 
     @staticmethod
-    def check_overlap(a, b):
-        # check b is in a
-        center_vector = b.center - a.center
-        c_angle=np.arctan2(center_vector[1], center_vector[0])
-        if (a.lengh(c_angle) + b.lengh(c_angle + np.pi) - np.linalg.norm(center_vector)) > 0:
-            return True
+    def tangent_circle(x,y,angle):
+        _radius = 0.10
+        # n_vector = angle - np.pi/2
+        n_vector = angle - 0
+        x0 = x + _radius * np.cos(n_vector)
+        y0 = y + _radius * np.sin(n_vector)
+        ap, bp = _radius, _radius
+        e, phi = 0, 0
+        return x0, y0, ap, bp, e, phi
 
-        # check a and b is overlapped
-        c_angle += np.pi
-        angle_range = np.pi/1.5
-        x, y = b.get_ellipse_pts(npts=50,tmin=c_angle - angle_range, tmax=c_angle + angle_range)
-        angle = np.arctan2(y - a.pole[1], x - a.pole[0])
-        lenghts = np.linalg.norm(np.array([x - a.center[0],y - a.center[1]]), axis=0).reshape(-1)
-        points = a.point(angle).T
-        lenghts2 = np.linalg.norm(points - a.center, axis=1)
+    @staticmethod
+    def check_overlap_area(a, b):
 
-        return np.any((lenghts - lenghts2) < 0)
+        _c_vector = b.center - a.center
+        _c_angle = np.arctan2(_c_vector[1], _c_vector[0])
+        x, y = a.get_ellipse_pts(100 , _c_angle - np.pi/2, np.pi)
+        angle = np.arctan2(y - b.center[1], x - b.center[0])
+        lengths = np.linalg.norm(np.array([x - b.center[0],y - b.center[1]]), axis=0).reshape(-1)
+        points = np.array(b.point(angle)).T
+        lengths2 = np.linalg.norm(points - b.center, axis=1)
+        x = x[np.where((lengths - lengths2) <= 0)]
+        y = y[np.where((lengths - lengths2) <= 0)]
+        angle = np.arctan2(y - a.center[1],x - a.center[0])
+
+        if len(angle) == 0: 
+            return None
+        else:
+            return Angle(angle[0], angle[-1])
+            # return np.array([(angle[0] + angle[-1]) / 2, angle[-1] - angle[0]])
+
+
+
+    @staticmethod
+    def check_collision(ellipse, points, threshold: float = 0.01):
+        angle = np.arctan2(points[1] - ellipse.pole[1], points[0] - ellipse.pole[0])
+        lengths = np.linalg.norm(np.array([points[0] - ellipse.center[0],points[1] - ellipse.center[1]]), axis=0).reshape(-1)
+        el_points = np.array(ellipse.point(angle)).T
+        lengths2 = np.linalg.norm(el_points - ellipse.center, axis=1)
+        return np.all(lengths2 - lengths < 0)
+        

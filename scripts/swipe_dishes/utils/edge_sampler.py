@@ -2,7 +2,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.spatial import ConvexHull
 from scipy.interpolate import interp1d
-from ..utils.minimum_bounding_box import MinimumBoundingBox
 
 class Edge(object):
     def __init__(self, edge_xyz, edge_uv):
@@ -45,50 +44,6 @@ class Edge(object):
         rand_idx = np.random.randint(0, len(self.edge_xyz), sample)
         # plot edge points
         return self.edge_xyz[rand_idx, 0], self.edge_xyz[rand_idx, 1]
-
-    @property
-    def min_bbox(self):
-        """
-        Minimum bounding box in contact local frame.
-
-        Returns:
-            min_bbox (numpy.ndarray): (4, 2) minimum bounding box.
-        """
-        min_bbox = MinimumBoundingBox(self.edge_xyz[:,:2]).corner_points
-        min_bbox = np.array(list(min_bbox))
-        
-        # transfrom min bbox to local frame
-        min_bbox = min_bbox - self.pose[:2]
-        rot_mat = np.array([
-            [np.cos(-self.pose[2]), -np.sin(-self.pose[2])],
-            [np.sin(-self.pose[2]), np.cos(-self.pose[2])]])
-        min_bbox = np.dot(rot_mat, min_bbox.T)
-        min_bbox = min_bbox.T
-
-        # sort as ccw
-        def ccw(A, B, C):
-            return (C[1]-A[1])*(B[0]-A[0]) > (B[1]-A[1])*(C[0]-A[0])
-
-        def convex_hull(points):
-            n = len(points)
-            l = 0
-            for i in range(1,n):
-                if points[i][0] < points[l][0]:
-                    l = i
-            hull = [points[l]]
-            p = l
-            while True:
-                q = (p+1)%n
-                for i in range(n):
-                    if ccw(points[p], points[i], points[q]):
-                        q = i
-                p = q
-                if p == l:
-                    break
-                hull.append(points[p])
-            return np.array(hull)
-
-        return convex_hull(min_bbox)
         
 class EdgeSampler(object):
     '''

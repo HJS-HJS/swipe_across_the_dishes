@@ -1,4 +1,5 @@
 import numpy as np
+from .utils import Angle
 
 class Ellipse(object):
     def __init__(self, x, y, mode:str = "fit"):
@@ -163,7 +164,7 @@ class Ellipse(object):
 
     @staticmethod
     def tangent_circle(x,y,angle):
-        _radius = 0.10
+        _radius = 0.07
         # n_vector = angle - np.pi/2
         n_vector = angle - 0
         x0 = x + _radius * np.cos(n_vector)
@@ -190,9 +191,6 @@ class Ellipse(object):
             return None
         else:
             return Angle(angle[0], angle[-1])
-            # return np.array([(angle[0] + angle[-1]) / 2, angle[-1] - angle[0]])
-
-
 
     @staticmethod
     def check_collision(ellipse, points, threshold: float = 0.01):

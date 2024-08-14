@@ -5,6 +5,9 @@ class Angle():
         self.start = start
         self.end = end
 
+        if start > end:
+            self.end += 2 * np.pi
+
     def resize(self, size):
         self.start += size
         self.end += size
@@ -27,9 +30,7 @@ class Angle():
         if diff > np.pi:
             a, b = b, a
             diff = 2 * np.pi - diff
-            # print("a, b changed")
 
-        # center = (a.center + diff / 2) % (2 * np.pi)
         offset = a.center + diff - b.center
         b.resize(offset)
         start = np.min([a.start, b.start])
@@ -43,5 +44,13 @@ class Angle():
     
     @staticmethod
     def distance(a, b):
-        sum = Angle.sum(a,b)
-        return (sum.end - sum.start)
+        diff = (b.center - a.center)%(2 * np.pi)
+        if diff > np.pi:
+            a, b = b, a
+            diff = 2 * np.pi - diff
+            # print("a, b changed")
+
+        # center = (a.center + diff / 2) % (2 * np.pi)
+        offset = a.center + diff - b.center
+        b.resize(offset)
+        return b.start - a.end

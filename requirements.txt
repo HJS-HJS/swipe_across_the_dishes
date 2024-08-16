@@ -1,10 +1,7 @@
-collision
+cv_bridge
+numpy == 1.21.0
+matplotlib
 opencv-python
-parmap
-pyyaml
+PyYAML
 rospkg
-seaborn
-scikit-learn
 scipy
-shapely
-torch

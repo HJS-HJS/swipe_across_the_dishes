@@ -102,7 +102,7 @@ class SwipeAcrossTheDishesServer(object):
         # Sample the edge points where the dishes can be pushed.
         target_edge = cps.sample(masked_depth_image)
         target_ellipse = Ellipse(target_edge.edge_xyz[:,0], target_edge.edge_xyz[:,1])
-        target_ellipse.resize(self.planner_config["swipe_r_margin"], self.planner_config["swipe_r_margin"])
+        target_ellipse.resize(self.planner_config["dish_r_margin"], self.planner_config["dish_r_margin"])
 
         # Sample the obs edge points where the dishes can be pushed.
         obs_edge_list=[]
@@ -112,7 +112,7 @@ class SwipeAcrossTheDishesServer(object):
         obs_ellipse_list=[]
         for _obs in obs_edge_list:
             _obs_ellipse = Ellipse(_obs.edge_xyz[:,0], _obs.edge_xyz[:,1])
-            _obs_ellipse.resize(self.planner_config["swipe_r_margin"], self.planner_config["swipe_r_margin"])
+            _obs_ellipse.resize(self.planner_config["dish_r_margin"], self.planner_config["dish_r_margin"])
             obs_ellipse_list.append(_obs_ellipse)
         
 
@@ -135,11 +135,9 @@ class SwipeAcrossTheDishesServer(object):
                         _shortest_dix, _min_dist = _idx, _dis
                 _temp = overlap_range[_shortest_dix]
                 path_angle = Angle.sum(path_angle, overlap_range.pop(_shortest_dix))
-            rospy.loginfo("results: {0}".format(np.rad2deg(np.array([path_angle.start, path_angle.end]))))
+            # rospy.loginfo("results: {0}".format(np.rad2deg(np.array([path_angle.start, path_angle.end]))))
         else: 
             return self.path_failed("overlap not occur")
-            
-        # if ((2 * np.pi - path_angle.size) * (target_ellipse.radius) < self.gripper_config["width"]) / 2: return self.path_failed("gripper collision occur")
 
         finger_path_xy = target_ellipse.get_ellipse_pts(npts=75, tmin=path_angle.start, trange=path_angle.end - path_angle.start)
         
@@ -181,8 +179,8 @@ class SwipeAcrossTheDishesServer(object):
                 finger_path_xy = np.flip(finger_path_xy, axis=1)
                 finger_path_xy = np.concatenate([e_path_xy[:,1:-1], finger_path_xy], axis=1)
             else:
-                rospy.logwarn("failed end path")
-                # return self.path_failed("failed end path")
+                # rospy.logwarn("failed end path")
+                return self.path_failed("failed end path")
                 
         # Set pushing velocity
         _vel = self.planner_config["swipe_speed"] # m/s
@@ -209,7 +207,6 @@ class SwipeAcrossTheDishesServer(object):
             _pose.position.x, _pose.position.y = point[0], point[1]
             # finger position z along table pose
             _pose.position.z = self.planner_config['height'] + self.cal_path_height(point[0], point[1])
-            print(self.planner_config['height'], self.cal_path_height(point[0], point[1]))
             # finger orientation matrix
             path_rot_matrix = np.dot(rot_matrix, tft.euler_matrix(_angle + np.deg2rad(self.gripper_config["z_angle"]), 0, 0, axes='rzxy'))
             # finger orientation x, y, z, w
@@ -218,7 +215,7 @@ class SwipeAcrossTheDishesServer(object):
 
         # Jaeseog code
         # _is_collision is True when start with e_path_xy
-        eef_path, bf_path = cartesianTraj2EETraj(finger_path, gripper_radius = self.gripper_config["width"], margin_angle = np.deg2rad(self.planner_config["swipe_angle"]), alpha = 0.01, clock_wise = not _is_collision)
+        eef_path, bf_path = cartesianTraj2EETraj(finger_path, gripper_radius = self.gripper_config["width"], margin_angle = np.deg2rad(0), alpha = 0.01, clock_wise = not _is_collision)
         _clockwise = 1 if _is_collision else -1
         
         # vis
@@ -235,13 +232,13 @@ class SwipeAcrossTheDishesServer(object):
             ax2.set_ylim([map_corners[2] - 0.1, map_corners[3] + 0.1])
                 
             for obs in obs_ellipse_list:
-                obs.resize(-self.planner_config["swipe_r_margin"], -self.planner_config["swipe_r_margin"])
+                obs.resize(-self.planner_config["dish_r_margin"], -self.planner_config["dish_r_margin"])
                 x, y = obs.get_ellipse_pts()
                 ax1.scatter(obs.center[0], obs.center[1])
                 ax1.fill_between(x, y, color='darkred')
 
                 ax2.fill_between(x, y, color='darkred')
-                obs.resize(self.planner_config["swipe_r_margin"], self.planner_config["swipe_r_margin"])
+                obs.resize(self.planner_config["dish_r_margin"], self.planner_config["dish_r_margin"])
                 x, y = obs.get_ellipse_pts()
                 ax2.scatter(obs.center[0], obs.center[1])
                 ax2.plot(x, y, color='darkred')
@@ -269,7 +266,7 @@ class SwipeAcrossTheDishesServer(object):
             x, y = origin_target_ellipse.get_ellipse_pts()
             ax2.fill_between(x, y, color='gray')
             ax2.scatter(origin_target_ellipse.center[0], origin_target_ellipse.center[1])
-            origin_target_ellipse.resize(self.planner_config["swipe_r_margin"], self.planner_config["swipe_r_margin"])
+            origin_target_ellipse.resize(self.planner_config["dish_r_margin"], self.planner_config["dish_r_margin"])
             x, y = origin_target_ellipse.get_ellipse_pts()
             ax2.plot(x, y, color='black')
 
@@ -332,12 +329,12 @@ class SwipeAcrossTheDishesServer(object):
             eef_path_msg = Path()
             eef_path_msg.header.frame_id = camera_pose_msg.header.frame_id
             eef_path_msg.header.stamp = rospy.Time.now()
-            for each_point in eef_path.poses:
+            for each_point in path_msg.points:
                 _pose_stamped = PoseStamped()
                 _pose_stamped.header.stamp = rospy.Time.now()
                 _pose_stamped.header.frame_id = camera_pose_msg.header.frame_id
-                _pose_stamped.pose.position = each_point.position
-                _pose_stamped.pose.orientation = each_point.orientation
+                _pose_stamped.pose.position = each_point.point.pose.position
+                _pose_stamped.pose.orientation = each_point.point.pose.orientation
                 eef_path_msg.poses.append(_pose_stamped)
 
             self.push_path_origin_pub.publish(first_path_msg)
@@ -346,8 +343,8 @@ class SwipeAcrossTheDishesServer(object):
             self.push_path_moveit.publish(path_msg)
 
             
-        rospy.loginfo("Path Time: {0}".format(_spent_time.to_sec()))
-        rospy.loginfo("Path Lenght: {0}".format(_path_lenght))
+        rospy.loginfo("Swipe Time: {0}".format(_spent_time.to_sec()))
+        rospy.loginfo("Swipe Path Lenght: {0}".format(_path_lenght))
         res = GetSwipeDishesPathResponse()   
         res.path = path_msg
         if len(path_msg.points) == 0:
@@ -400,7 +397,6 @@ class SwipeAcrossTheDishesServer(object):
         
         x_max, x_min = np.max(vertices_world[:,0]), np.min(vertices_world[:,0])
         y_max, y_min = np.max(vertices_world[:,1]), np.min(vertices_world[:,1])
-        # z_max, z_min = np.max(vertices_world[:,2]), np.min(vertices_world[:,2])
         
         x_vector = rot_mat @ np.array([self.size_msg.x / 2,0,0])
         y_vector = rot_mat @ np.array([0,self.size_msg.y / 2,0])
@@ -411,40 +407,14 @@ class SwipeAcrossTheDishesServer(object):
 
     def is_bound_out(self, center, ellipse_list, push_angle, push_width, table_center_xy, table_vectors_xy):
         ''' Check if the dished is out of the table.'''
-        # print(table_vectors_xy[0][0:2])
-        # print("table")
-        # print(table_center_xy)
-        # print("x", np.linalg.norm(table_vectors_xy[0][0:2]), table_vectors_xy[0][0:2])
-        # print("y", np.linalg.norm(table_vectors_xy[1][0:2]), table_vectors_xy[1][0:2])
-        # print("dishes")
-        # _temp = []
         for ellipse in ellipse_list:
             c_vector = ellipse.center - center
-            # print("center", center)
-            # print("ellipse.center", ellipse.center)
-            # print("c_vector   \t", c_vector)
             c_vector = c_vector / np.linalg.norm(c_vector) * push_width
-            # print("c_vector_width\t", c_vector)
             rot_matrix = np.array([
                 [np.cos(push_angle), -np.sin(push_angle)],
                 [np.sin(push_angle), np.cos(push_angle)],
             ])
             t_vector = rot_matrix @ c_vector + ellipse.center - table_center_xy
-            # print("c_vector@r\t", rot_matrix @ c_vector)
-            # print("c_vector_table\t", rot_matrix @ c_vector + ellipse.center)
-            # print("table\t", table_center_xy)
-            # print("c_vector_from t\t", rot_matrix @ c_vector + ellipse.center - table_center_xy)
-            # print("t_vector \t", t_vector)
-            # _x = t_vector @ table_vectors_xy[0][0:2] / np.linalg.norm(table_vectors_xy[0][0:2])
-            # _y = t_vector @ table_vectors_xy[1][0:2] / np.linalg.norm(table_vectors_xy[1][0:2])
-            # if (np.abs(t_vector @ table_vectors_xy[0][0:2]) < np.power(np.linalg.norm(table_vectors_xy[0][0:2]),2)):
-            #     # print("True")
-            # if (np.abs(t_vector @ table_vectors_xy[1][0:2]) < np.power(np.linalg.norm(table_vectors_xy[1][0:2]),2)):
-            #     # print("True")
-            # _temp.append([_x + table_center_xy[0],
-            #               _y
-            #               ])
-            
             if (np.abs(t_vector @ table_vectors_xy[0][0:2]) > np.power(np.linalg.norm(table_vectors_xy[0][0:2]),2)):
                 return(True)
             if (np.abs(t_vector @ table_vectors_xy[1][0:2]) > np.power(np.linalg.norm(table_vectors_xy[1][0:2]),2)):
@@ -453,43 +423,20 @@ class SwipeAcrossTheDishesServer(object):
     
     def is_bound_out_point(self, center, ellipse_list, push_angle, push_width, table_center_xy, table_vectors_xy):
         ''' Check if the dished is out of the table.'''
-        # print(table_vectors_xy[0][0:2])
-        # print("table")
-        # print(table_center_xy)
-        # print("x", np.linalg.norm(table_vectors_xy[0][0:2]), table_vectors_xy[0][0:2])
-        # print("y", np.linalg.norm(table_vectors_xy[1][0:2]), table_vectors_xy[1][0:2])
-        # print("dishes")
         _temp = []
         for ellipse in ellipse_list:
             c_vector = ellipse.center - center
-            # print("center", center)
-            # print("ellipse.center", ellipse.center)
-            # print("c_vector   \t", c_vector)
             c_vector = c_vector / np.linalg.norm(c_vector) * push_width
             rot_matrix = np.array([
                 [np.cos(push_angle), -np.sin(push_angle)],
                 [np.sin(push_angle), np.cos(push_angle)],
             ])
             t_vector = rot_matrix @ c_vector + ellipse.center - table_center_xy
-            # print("c_vector@r\t", rot_matrix @ c_vector)
-            # print("c_vector_table\t", rot_matrix @ c_vector + ellipse.center)
-            # print("table\t", table_center_xy)
-            # print("c_vector_from t\t", rot_matrix @ c_vector + ellipse.center - table_center_xy)
-            # print("t_vector \t", t_vector)
             _x = t_vector @ table_vectors_xy[0][0:2] / np.linalg.norm(table_vectors_xy[0][0:2])
             _y = t_vector @ table_vectors_xy[1][0:2] / np.linalg.norm(table_vectors_xy[1][0:2])
-            # if (np.abs(t_vector @ table_vectors_xy[0][0:2]) < np.power(np.linalg.norm(table_vectors_xy[0][0:2]),2)):
-            #     # print("True")
-            # if (np.abs(t_vector @ table_vectors_xy[1][0:2]) < np.power(np.linalg.norm(table_vectors_xy[1][0:2]),2)):
-            #     # print("True")
             _temp.append([_x + table_center_xy[0],
                           _y
                           ])
-            
-            # if (np.abs(t_vector @ table_vectors_xy[0][0:2]) > np.power(np.linalg.norm(table_vectors_xy[0][0:2]),2)):
-            #     return(True)
-            # if (np.abs(t_vector @ table_vectors_xy[1][0:2]) > np.power(np.linalg.norm(table_vectors_xy[1][0:2]),2)):
-            #     return(True)
         return _temp
 
     def cal_path_height(self, x, y):
